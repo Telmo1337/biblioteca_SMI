@@ -18,7 +18,7 @@ API REST
 1. **Clonar o repositório:**
 
 ```bash
-git clone https://github.com/Telmo1337/biblioteca_SMI.git
+git clone https://github.com/Telmo1337/biblioteca_.git
 cd biblioteca_SMI
 ```
 
