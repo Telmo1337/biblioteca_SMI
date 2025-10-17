@@ -44,6 +44,7 @@ PORT=3000
 
 ```bash
 npx prisma migrate deploy
+npx prisma generate
 ```
 
 5. **Executar o servidor:**
