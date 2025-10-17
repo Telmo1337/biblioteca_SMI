@@ -35,10 +35,12 @@ yarn install
 Cria/atualize o ficheiro `.env` na raíz do projeto com o seguinte conteúdo:
 
 ```env
-DATABASE_URL="mysql://<user:password>@localhost:3306/api_biblioteca"
+DATABASE_URL="mysql://<user:password>@localhost:3306/api_biblioteca" //normalmente seria ...root@...
 JWT_SECRET="chave_secreta_para_tokens"
 PORT=3000
 ```
+
+Abrir XAMP e iniciar o mysql e opcionalmente apache
 
 4. **Migrar a base de dados:**
 
