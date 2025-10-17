@@ -13,7 +13,7 @@ API REST
 
 ---
 
-## ⚙️ Instalação
+## Instalação
 
 1. **Clonar o repositório:**
 
@@ -55,13 +55,13 @@ npm run dev
 ```
 
 O servidor ficará disponível em:  
-👉 [http://localhost:3000](http://localhost:3000)
+ [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🔑 Testar Endpoints
+## Testar Endpoints
 
-### 🧍‍♂️ Autenticação
+### Autenticação
 
 #### Registo – `POST /auth/register`
 
@@ -98,7 +98,7 @@ Guarda o `accessToken` para autenticação nas próximas requisições.
 
 ---
 
-## ✍️ Gestão de Autores
+## Gestão de Autores
 
 ### Criar autor – `POST /catalog/authors`
 
