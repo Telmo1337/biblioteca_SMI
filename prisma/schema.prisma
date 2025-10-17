@@ -1,0 +1,147 @@
+// --- Fonte de dados (MySQL) e modo de relações ---
+datasource db {
+  provider     = "mysql"                 // Usa MySQL
+  url          = env("DATABASE_URL")     // Lê a ligação da variável de ambiente
+  relationMode = "foreignKeys"           // Liga FKs no próprio MySQL (não emulation)
+}
+
+// --- Geração do Prisma Client (JS) ---
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+
+// --- Enums de apoio (papéis de utilizador e estado de cópias) ---
+enum Role {
+  LIBRARIAN
+  MEMBER
+}
+
+enum CopyStatus {
+  AVAILABLE
+  RESERVED
+  LOANED
+  MAINTENANCE
+}
+
+// --- Utilizadores (contas) ---
+model User {
+  id          String   @id @default(cuid())           // PK string (cuid)
+  email       String   @unique @db.VarChar(191)       // único; 191 evita problemas com índices em MySQL
+  name        String
+  password    String                                   // hash bcrypt
+  role        Role     @default(MEMBER)                // MEMBER por defeito
+  mfaEnabled  Boolean  @default(false)                 // MFA ativo?
+  mfaSecret   String?  @db.VarChar(191)                // segredo TOTP (base32) quando configurado
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relações inversas (1:N) — um user tem muitos empréstimos/reservas
+  loans        Loan[]
+  reservations Reservation[]
+}
+
+// --- Autores ---
+// Nota: relação N–N é explícita via modelo BookAuthor (tabela de junção)
+model Author {
+  id    String        @id @default(cuid())
+  name  String        @unique @db.VarChar(191)   // nomes únicos (ajusta se precisares de homónimos)
+  books BookAuthor[]                            // liga à tabela de junção
+}
+
+// --- Livros ---
+model Book {
+  id          String       @id @default(cuid())
+  title       String       @db.VarChar(255)
+  isbn        String?      @unique @db.VarChar(191)   // ISBN opcional, mas único se existir
+  description String?      @db.Text
+  year        Int?
+  authors     BookAuthor[]                            // N–N explícita (ver BookAuthor)
+  copies      BookCopy[]                              // 1:N — um livro tem várias cópias físicas
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([title])          // acelera pesquisas por título
+}
+
+// --- Tabela de junção Livro<->Autor (N–N explícita) ---
+model BookAuthor {
+  bookId   String
+  authorId String
+
+  // Relations + FKs com cascata (apagar livro/autor apaga junções)
+  book     Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  author   Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, authorId])  // PK composta garante unicidade da dupla
+}
+
+// --- Cópia física do livro ---
+model BookCopy {
+  id           String     @id @default(cuid())
+  bookId       String
+  inventoryNo  String     @unique @db.VarChar(191)   // nº de inventário único (ex.: código da etiqueta)
+  status       CopyStatus @default(AVAILABLE)        // estado atual da cópia
+  shelfCode    String?    @db.VarChar(191)           // localização/cota na estante
+  reservedById String?    @db.VarChar(191)           // id do user que tem a reserva “à vez” (campo rápido)
+  reservedAt   DateTime?                              // quando ficou reservada
+  book         Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  // Históricos associados
+  loans        Loan[]                                  // empréstimos desta cópia
+  reservations Reservation[]                           // reservas desta cópia
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([bookId, status])  // pesquisas por livro e estado (disponível/emprestado/…)
+}
+
+// --- Empréstimos ---
+model Loan {
+  id         String   @id @default(cuid())
+  copyId     String
+  userId     String
+  loanedAt   DateTime @default(now())   // quando saiu
+  dueAt      DateTime                   // data limite prevista
+  returnedAt DateTime?                  // quando voltou (null enquanto em aberto)
+
+  // FKs com cascata — se a cópia/user forem apagados, apaga o empréstimo
+  copy BookCopy @relation(fields: [copyId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, returnedAt])   // listar empréstimos abertos por user
+  @@index([copyId, returnedAt])   // encontrar o empréstimo aberto da cópia
+}
+
+// --- Reservas ---
+model Reservation {
+  id          String   @id @default(cuid())
+  copyId      String
+  userId      String
+  reservedAt  DateTime @default(now())
+  expiresAt   DateTime               // validade da reserva (ex.: 48h)
+  fulfilledAt DateTime?              // quando foi convertida em empréstimo
+  canceledAt  DateTime?              // se o utilizador cancelou/expirou
+
+  // FKs com cascata
+  copy BookCopy @relation(fields: [copyId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Índices para encontrar rapidamente reservas ativas/expiradas
+  @@index([copyId, canceledAt, fulfilledAt, expiresAt])
+  @@index([userId, canceledAt, fulfilledAt])
+}
+
+
+/*
+# Validar e formatar
+npx prisma validate
+npx prisma format
+
+# Criar/atualizar tabelas no MySQL (dev)
+npx prisma migrate dev --name init
+
+# Gerar client (se alterares o schema)
+npx prisma generate
+*/
